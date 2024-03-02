@@ -1,60 +1,79 @@
 use std::env;
-//literally copied and pasted template from github
-//dw i'll make it cool soon
-use serenity::async_trait;
-use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
-use serenity::prelude::*;
-use tokio::runtime::Runtime; //why isn't this included???
-use dotenv::dotenv;
-struct Handler;
+use poise::serenity_prelude as serenity;
+use liquid_breakout_backend::Backend;
+mod commands;
+pub mod checks;
 
-#[async_trait]
-impl EventHandler for Handler {
-    // Set a handler for the `message` event - so that whenever a new message is received - the
-    // closure (or function) passed will be called.
-    //
-    // Event handlers are dispatched through a threadpool, and so multiple events can be dispatched
-    // simultaneously.
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            // Sending a message can fail, due to a network error, an authentication error, or lack
-            // of permissions to post in the channel, so log to stdout when some error happens,
-            // with a description of it.
-            if let Err(why) = msg.channel_id.say(&ctx.http, "Pong! Ready to escape the liquid.").await {
-                println!("Error sending message: {why:?}");
+pub struct Data {
+    backend: Backend,
+    ingame_mod_roleid: serenity::RoleId
+}
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, Data, Error>;
+
+async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
+    // This is our custom error handler
+    // They are many errors that can occur, so we only handle the ones we want to customize
+    // and forward the rest to the default handler
+    match error {
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Command { error, ctx, .. } => {
+            println!("Error in command `{}`: {:?}", ctx.command().name, error,);
+        }
+        error => {
+            if let Err(e) = poise::builtins::on_error(error).await {
+                println!("Error while handling error: {}", e)
             }
         }
-    }
-
-    // Set a handler to be called on the `ready` event. This is called when a shard is booted, and
-    // a READY payload is sent by Discord. This payload contains data like the current user's guild
-    // Ids, current user data, private channels, and more.
-    //
-    // In this case, just print what the current user's username is.
-    async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
     }
 }
 
 #[tokio::main]
 async fn main() {
-    dotenv().ok();
-    
-    // Configure the client with your Discord bot token in the environment.
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
-    // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::all();
+    let discord_token = env::var("DISCORD_TOKEN").expect("DiscordBot cannot start: Failed to read DISCORD_TOKEN from environment");
+    let roblox_cookie = env::var("ROBLOX_COOKIE").expect("DiscordBot cannot start: Failed to read ROBLOX_COOKIE from environment");
+    let mongodb_url = env::var("MONGODB_URL").expect("DiscordBot cannot start: Failed to read MONGODB_URL from environment");
 
-    // Create a new instance of the Client, logging in as a bot. This will automatically prepend
-    // your bot token with "Bot ", which is a requirement by Discord for bot users.
-    let mut client =
-        Client::builder(&token, intents).event_handler(Handler).await.expect("Err creating client");
-    // Finally, start a single shard, and start listening to events.
-    //
-    // Shards will automatically attempt to reconnect, and will perform exponential backoff until
-    // it reconnects.
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
+    println!("Server starting up.");
+
+    let mut backend = Backend::new(
+        roblox_cookie,
+        vec![
+            "123456789*=+-aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ".to_string(),
+            "0123456789".to_string()
+        ]
+    );
+    let connect_result = backend.connect_mongodb(mongodb_url, None).await;
+    match connect_result {
+        Ok(_) => {},
+        Err(e) => panic!("DiscordBot cannot start: Failed to connect to MongoDB, reason: {}", (*e).to_string())
     }
+
+    let intents = serenity::GatewayIntents::all();
+
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: vec![
+                commands::whitelist(),
+                commands::getnumberid(),
+                commands::getshareableid()
+            ],
+            on_error: |error| Box::pin(on_error(error)),
+            ..Default::default()
+        })
+        .setup(|ctx, _ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(Data { 
+                    backend,
+                    ingame_mod_roleid: 1185747952162058390.into()
+                })
+            })
+        })
+        .build();
+
+    let client = serenity::ClientBuilder::new(discord_token, intents)
+        .framework(framework)
+        .await;
+    client.unwrap().start().await.unwrap();
 }
