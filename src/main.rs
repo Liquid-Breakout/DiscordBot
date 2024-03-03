@@ -58,13 +58,23 @@ async fn main() {
                 commands::getnumberid(),
                 commands::getshareableid()
             ],
+            prefix_options: poise::PrefixFrameworkOptions {
+				prefix: Some("?".into()),
+                ..Default::default()
+            },
             on_error: |error| Box::pin(on_error(error)),
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data { 
+                ctx.set_activity(Some(serenity::ActivityData::listening(
+                    format!(
+                        "Prefix: {} - Bot by shiinazzz/Koda",
+                        framework.options().prefix_options.prefix.clone().unwrap_or("".to_string())
+                    )
+                )));
+                Ok(Data {
                     backend,
                     ingame_mod_roleid: 1185747952162058390.into()
                 })
