@@ -1,3 +1,5 @@
+#![feature(proc_macro_hygiene, decl_macro)]
+
 use std::env;
 use poise::serenity_prelude as serenity;
 use liquid_breakout_backend::Backend;
@@ -12,7 +14,6 @@ pub struct Data {
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-#![feature(proc_macro_hygiene, decl_macro)]
 #[macro_use] extern crate rocket;
 
 #[get("/")]
@@ -29,7 +30,7 @@ async fn main() {
     tokio::spawn(async move {    
         // for render web service stuff
         rocket::ignite().mount("/", routes![hello]).launch();
-    })
+    });
 
     println!("DiscordBot starting up.");
 
