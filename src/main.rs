@@ -1,6 +1,5 @@
-#![feature(proc_macro_hygiene, decl_macro)]
-
 use std::env;
+use tokio::net::TcpListener;
 use poise::serenity_prelude as serenity;
 use liquid_breakout_backend::Backend;
 mod commands;
@@ -14,23 +13,12 @@ pub struct Data {
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-#[macro_use] extern crate rocket;
-
-#[get("/")]
-fn hello() -> &'static str {
-    "Hello, world!"
-}
 
 #[tokio::main]
 async fn main() {
     let discord_token = env::var("DISCORD_TOKEN").expect("DiscordBot cannot start: Failed to read DISCORD_TOKEN from environment");
     let roblox_cookie = env::var("ROBLOX_COOKIE").expect("DiscordBot cannot start: Failed to read ROBLOX_COOKIE from environment");
     let mongodb_url = env::var("MONGODB_URL").expect("DiscordBot cannot start: Failed to read MONGODB_URL from environment");
-
-    tokio::spawn(async move {    
-        // for render web service stuff
-        rocket::ignite().mount("/", routes![hello]).launch();
-    });
 
     println!("DiscordBot starting up.");
 
@@ -96,5 +84,24 @@ async fn main() {
     let client = serenity::ClientBuilder::new(discord_token, intents)
         .framework(framework)
         .await;
+
+    // for render web service stuff
+    tokio::spawn(async move {
+        let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+
+        loop {
+            let (mut socket, _) = listener.accept().await?;
+            tokio::spawn(async move {
+                let mut buf = vec![0; 1024];
+                loop {
+                    socket
+                        .write_all("Hello, world!".as_bytes())
+                        .await
+                        .expect("failed to write data to socket");
+                }
+            });
+        }
+    });
+
     client.unwrap().start().await.unwrap();
 }
