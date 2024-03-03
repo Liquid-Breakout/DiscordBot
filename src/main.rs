@@ -6,7 +6,8 @@ pub mod checks;
 
 pub struct Data {
     backend: Backend,
-    ingame_mod_roleid: serenity::RoleId
+    ingame_mod_roleid: serenity::RoleId,
+    privilege_users: Vec<serenity::UserId>
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -76,7 +77,14 @@ async fn main() {
                 )));
                 Ok(Data {
                     backend,
-                    ingame_mod_roleid: 1185747952162058390.into()
+                    ingame_mod_roleid: 1185747952162058390.into(),
+                    privilege_users: vec![
+                        915410908921077780.into(),
+                        849118831251030046.into(),
+                        456202569740713986.into(),
+                        268973336392892416.into(),
+                        876892716208889897.into()
+                    ]
                 })
             })
         })
