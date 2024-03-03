@@ -26,6 +26,11 @@ async fn main() {
     let roblox_cookie = env::var("ROBLOX_COOKIE").expect("DiscordBot cannot start: Failed to read ROBLOX_COOKIE from environment");
     let mongodb_url = env::var("MONGODB_URL").expect("DiscordBot cannot start: Failed to read MONGODB_URL from environment");
 
+    tokio::spawn(async move {    
+        // for render web service stuff
+        rocket::ignite().mount("/", routes![hello]).launch();
+    })
+
     println!("DiscordBot starting up.");
 
     let mut backend = Backend::new(
@@ -91,7 +96,4 @@ async fn main() {
         .framework(framework)
         .await;
     client.unwrap().start().await.unwrap();
-    
-    // for render web service stuff
-    rocket::ignite().mount("/", routes![hello]).launch();
 }
