@@ -1,10 +1,9 @@
-use crate::{Context, Error, checks::check_is_ingame_mod};
+use crate::{Context, Error};
 
 #[poise::command(
     slash_command,
     prefix_command,
-    ephemeral,
-    check = "check_is_ingame_mod"
+    ephemeral
 )]
 pub async fn getshareableid(
     ctx: Context<'_>,
