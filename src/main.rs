@@ -12,39 +12,13 @@ pub struct Data {
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
-    // This is our custom error handler
-    // They are many errors that can occur, so we only handle the ones we want to customize
-    // and forward the rest to the default handler
-    match error {
-        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start DiscordBot: {:?}", error),
-        poise::FrameworkError::Command { error, ctx, .. } => {
-            println!("Error in command `{}`: {:?}", ctx.command().name, error);
-            let _ = ctx.say(format!("Error in command `{}`: {:?}", ctx.command().name, error)).await;
-        }
-        poise::FrameworkError::ArgumentParse { error, ctx, .. } => {
-            println!("Error while parsing argument(s) for command `{}`: {:?}", ctx.command().name, error);
-            let _ = ctx.say(format!("Error while parsing argument(s) for command `{}`: {:?}", ctx.command().name, error)).await;
-        }
-        error => {
-            if let Err(e) = poise::builtins::on_error(error).await {
-                println!("Error while handling error: {}", e)
-            }
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() {
-    // for render web service stuff
-    let ip = "0.0.0.0:8001";
-    let _ = tokio::net::TcpListener::bind(ip).await.expect("Unable to create listener.");
-
     let discord_token = env::var("DISCORD_TOKEN").expect("DiscordBot cannot start: Failed to read DISCORD_TOKEN from environment");
     let roblox_cookie = env::var("ROBLOX_COOKIE").expect("DiscordBot cannot start: Failed to read ROBLOX_COOKIE from environment");
     let mongodb_url = env::var("MONGODB_URL").expect("DiscordBot cannot start: Failed to read MONGODB_URL from environment");
 
-    println!("Server starting up.");
+    println!("DiscordBot starting up.");
 
     let mut backend = Backend::new(
         roblox_cookie,
@@ -72,7 +46,13 @@ async fn main() {
 				prefix: Some("?".into()),
                 ..Default::default()
             },
-            on_error: |error| Box::pin(on_error(error)),
+            on_error: |error| {
+				Box::pin(async move {
+					if let Err(e) = poise::builtins::on_error(error).await {
+						println!("Error while handling error: {}", e);
+					}
+				})
+			},
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
@@ -103,4 +83,14 @@ async fn main() {
         .framework(framework)
         .await;
     client.unwrap().start().await.unwrap();
+    
+    // for render web service stuff
+    let host = "0.0.0.0";
+    let port = "8080";
+
+    let server = simple_server::Server::new(|_, mut response| {
+        Ok(response.body("Hello world!".as_bytes().to_vec())?)
+    });
+
+    server.listen(host, port);
 }
