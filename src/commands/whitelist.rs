@@ -6,6 +6,8 @@ pub async fn whitelist(
     #[description = "Asset ID for whitelisting."]
     asset_id: u64
 ) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
+
     let backend = &ctx.data().backend;
     
     backend.whitelist_asset_without_user(asset_id).await?;
