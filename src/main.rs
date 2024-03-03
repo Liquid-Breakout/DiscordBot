@@ -12,6 +12,14 @@ pub struct Data {
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
+#![feature(proc_macro_hygiene, decl_macro)]
+#[macro_use] extern crate rocket;
+
+#[get("/")]
+fn hello() -> &'static str {
+    "Hello, world!"
+}
+
 #[tokio::main]
 async fn main() {
     let discord_token = env::var("DISCORD_TOKEN").expect("DiscordBot cannot start: Failed to read DISCORD_TOKEN from environment");
@@ -85,12 +93,5 @@ async fn main() {
     client.unwrap().start().await.unwrap();
     
     // for render web service stuff
-    let host = "0.0.0.0";
-    let port = "8080";
-
-    let server = simple_server::Server::new(|_, mut response| {
-        Ok(response.body("Hello world!".as_bytes().to_vec())?)
-    });
-
-    server.listen(host, port);
+    rocket::ignite().mount("/", routes![hello]).launch();
 }
