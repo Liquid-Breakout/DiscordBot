@@ -1,4 +1,6 @@
 use std::env;
+use tokio::net::TcpListener;
+use tokio::io::AsyncWriteExt;
 use poise::serenity_prelude as serenity;
 use liquid_breakout_backend::Backend;
 mod commands;
@@ -11,6 +13,7 @@ pub struct Data {
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
+
 
 #[tokio::main]
 async fn main() {
@@ -82,15 +85,24 @@ async fn main() {
     let client = serenity::ClientBuilder::new(discord_token, intents)
         .framework(framework)
         .await;
-    client.unwrap().start().await.unwrap();
-    
-    // for render web service stuff
-    let host = "0.0.0.0";
-    let port = "8080";
 
-    let server = simple_server::Server::new(|_, mut response| {
-        Ok(response.body("Hello world!".as_bytes().to_vec())?)
+    // for render web service stuff
+    tokio::spawn(async move {
+        let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                let mut buf = vec![0; 1024];
+                loop {
+                    socket
+                        .write_all("Hello, world!".as_bytes())
+                        .await
+                        .expect("failed to write data to socket");
+                }
+            });
+        }
     });
 
-    server.listen(host, port);
+    client.unwrap().start().await.unwrap();
 }
